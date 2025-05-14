@@ -1,20 +1,17 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
 <head>
-  <title>Select Playlist</title>
+    <title>Your Playlists</title>
 </head>
 <body>
-  <h1>Select a Playlist to Shuffle</h1>
-  <form action="/randomize" method="post">
-    {% for playlist in playlists %}
-      <div>
-        <input type="radio" name="playlist_id" value="{{ playlist.id }}" required>
-        <img src="{{ playlist.images[0].url if playlist.images }}" width="60">
-        {{ playlist.name }}
-      </div>
-    {% endfor %}
-    <br>
-    <button type="submit">Randomize</button>
-  </form>
+    <h1>Select a Playlist to Shuffle</h1>
+    <form method="POST" action="/randomize">
+        <select name="playlist_id">
+            {% for playlist in playlists %}
+                <option value="{{ playlist.id }}">{{ playlist.name }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit">Randomize</button>
+    </form>
 </body>
 </html>
