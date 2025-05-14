@@ -1,10 +1,10 @@
 from flask import Flask, redirect, request, session, url_for, render_template
+import os, random, requests, base64
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
-import os, random
 
 app = Flask(__name__)
-app.secret_key = "secret"  # Replace with a secure key
+app.secret_key = "your-secret"  # Change this securely
 
 sp_oauth = SpotifyOAuth(
     client_id=os.getenv("SPOTIPY_CLIENT_ID"),
@@ -13,63 +13,62 @@ sp_oauth = SpotifyOAuth(
     scope="playlist-read-private playlist-modify-private playlist-modify-public ugc-image-upload"
 )
 
+def get_spotify_client():
+    token_info = session.get("token_info")
+    if not token_info:
+        return None
+    if sp_oauth.is_token_expired(token_info):
+        token_info = sp_oauth.refresh_access_token(token_info["refresh_token"])
+        session["token_info"] = token_info
+    return spotipy.Spotify(auth=token_info["access_token"])
+
 @app.route("/")
 def index():
-    token_info = session.get("token_info", None)
-    if not token_info:
-        auth_url = sp_oauth.get_authorize_url()
-        return redirect(auth_url)
-    return redirect(url_for("playlists"))
-
+    if "token_info" in session:
+        return redirect("/playlists")
+    return redirect(sp_oauth.get_authorize_url())
 
 @app.route("/callback")
 def callback():
     code = request.args.get("code")
     token_info = sp_oauth.get_access_token(code)
     session["token_info"] = token_info
-    return redirect(url_for("playlists"))
-
-def get_spotify_client():
-    token_info = session.get("token_info", None)
-    if not token_info:
-        return redirect(url_for("index"))
-    if sp_oauth.is_token_expired(token_info):
-        token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
-        session["token_info"] = token_info
-    return spotipy.Spotify(auth=token_info["access_token"])
-
+    return redirect("/playlists")
 
 @app.route("/playlists")
 def playlists():
     sp = get_spotify_client()
+    if not sp:
+        return redirect("/")
     playlists = sp.current_user_playlists()["items"]
     return render_template("playlists.html", playlists=playlists)
 
 @app.route("/randomize", methods=["POST"])
 def randomize():
-    token_info = session.get("token_info")
-    sp = spotipy.Spotify(auth=token_info["access_token"])
+    sp = get_spotify_client()
+    if not sp:
+        return redirect("/")
+    
     playlist_id = request.form.get("playlist_id")
-
-    # Fetch original playlist data
     original = sp.playlist(playlist_id)
-    name = original["name"] + " (Shuffled)"
-    description = "Shuffled version of " + original["name"]
-    tracks = [track["track"]["uri"] for track in original["tracks"]["items"]]
+    tracks = [item["track"]["uri"] for item in original["tracks"]["items"]]
     random.shuffle(tracks)
 
-    # Create new playlist
-    user_id = sp.current_user()["id"]
-    new_playlist = sp.user_playlist_create(user_id, name, description=description, public=False)
+    new_playlist = sp.user_playlist_create(
+        sp.current_user()["id"],
+        original["name"] + " (Shuffled)",
+        description="Shuffled version of " + original["name"],
+        public=False
+    )
 
-    # Copy image
     if original["images"]:
-        image_url = original["images"][0]["url"]
-        import requests, base64
-        img_data = base64.b64encode(requests.get(image_url).content).decode("utf-8")
-        sp.playlist_upload_cover_image(new_playlist["id"], img_data)
+        img = base64.b64encode(requests.get(original["images"][0]["url"]).content).decode("utf-8")
+        sp.playlist_upload_cover_image(new_playlist["id"], img)
 
-    # Add shuffled tracks
     sp.playlist_add_items(new_playlist["id"], tracks)
 
-    return f"✅ New shuffled playlist created: {name}"
+    return f"✅ New shuffled playlist created: {original['name']} (Shuffled)"
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
