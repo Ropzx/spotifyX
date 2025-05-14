@@ -20,9 +20,13 @@ def get_spotify_client():
     if not token_info:
         return None
     if sp_oauth.is_token_expired(token_info):
-        token_info = sp_oauth.refresh_access_token(token_info["refresh_token"])
-        session["token_info"] = token_info
+        try:
+            token_info = sp_oauth.refresh_access_token(token_info["refresh_token"])
+            session["token_info"] = token_info
+        except Exception:
+            return None
     return spotipy.Spotify(auth=token_info["access_token"])
+
 
 # Homepage — redirect to login or playlists
 @app.route("/")
