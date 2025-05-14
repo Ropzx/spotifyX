@@ -19,13 +19,18 @@ def get_spotify_client():
     token_info = session.get("token_info")
     if not token_info:
         return None
+    
+    # Try to refresh if expired
     if sp_oauth.is_token_expired(token_info):
         try:
             token_info = sp_oauth.refresh_access_token(token_info["refresh_token"])
             session["token_info"] = token_info
         except Exception:
+            session.pop("token_info", None)  # Invalidate session on failure
             return None
+    
     return spotipy.Spotify(auth=token_info["access_token"])
+
 
 
 # Homepage — redirect to login or playlists
@@ -49,10 +54,17 @@ def callback():
 @app.route("/playlists")
 def playlists():
     sp = get_spotify_client()
-    if not sp:
-        return redirect("/")
-    playlists = sp.current_user_playlists()["items"]
+    if sp is None:
+        return redirect(url_for("index"))
+    
+    try:
+        playlists = sp.current_user_playlists()["items"]
+    except Exception:
+        session.pop("token_info", None)
+        return redirect(url_for("index"))
+
     return render_template("playlists.html", playlists=playlists)
+
 
 # Shuffle selected playlist and create a new one
 @app.route("/randomize", methods=["POST"])
