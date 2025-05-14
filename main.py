@@ -15,8 +15,12 @@ sp_oauth = SpotifyOAuth(
 
 @app.route("/")
 def index():
-    auth_url = sp_oauth.get_authorize_url()
-    return redirect(auth_url)
+    token_info = session.get("token_info", None)
+    if not token_info:
+        auth_url = sp_oauth.get_authorize_url()
+        return redirect(auth_url)
+    return redirect(url_for("playlists"))
+
 
 @app.route("/callback")
 def callback():
@@ -25,10 +29,19 @@ def callback():
     session["token_info"] = token_info
     return redirect(url_for("playlists"))
 
+def get_spotify_client():
+    token_info = session.get("token_info", None)
+    if not token_info:
+        return redirect(url_for("index"))
+    if sp_oauth.is_token_expired(token_info):
+        token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
+        session["token_info"] = token_info
+    return spotipy.Spotify(auth=token_info["access_token"])
+
+
 @app.route("/playlists")
 def playlists():
-    token_info = session.get("token_info")
-    sp = spotipy.Spotify(auth=token_info["access_token"])
+    sp = get_spotify_client()
     playlists = sp.current_user_playlists()["items"]
     return render_template("playlists.html", playlists=playlists)
 
