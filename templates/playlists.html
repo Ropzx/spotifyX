@@ -1,17 +1,20 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Your Playlists</title>
+    <title>Select a Playlist</title>
 </head>
 <body>
     <h1>Select a Playlist to Shuffle</h1>
-    <form method="POST" action="/randomize">
+    <form action="/randomize" method="post">
         <select name="playlist_id">
             {% for playlist in playlists %}
                 <option value="{{ playlist.id }}">{{ playlist.name }}</option>
             {% endfor %}
         </select>
-        <button type="submit">Randomize</button>
+        <br><br>
+        <button type="submit">Shuffle</button>
     </form>
+    <br>
+    <a href="/logout">Log Out</a>
 </body>
 </html>
