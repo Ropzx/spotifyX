@@ -72,26 +72,53 @@ def randomize():
     if not sp:
         return redirect("/")
 
-    playlist_id = request.form.get("playlist_id")
-    original = sp.playlist(playlist_id)
-    tracks = [item["track"]["uri"] for item in original["tracks"]["items"]]
-    random.shuffle(tracks)
+    try:
+        playlist_id = request.form.get("playlist_id")
+        if not playlist_id:
+            return "❌ No playlist ID provided."
 
-    new_playlist = sp.user_playlist_create(
-        sp.current_user()["id"],
-        original["name"] + " (Shuffled)",
-        description="Shuffled version of " + original["name"],
-        public=False
-    )
+        original = sp.playlist(playlist_id)
+        tracks_data = original["tracks"]["items"]
+        
+        if not tracks_data:
+            return "❌ No tracks found in this playlist."
 
-    if original["images"]:
-        img_data = requests.get(original["images"][0]["url"]).content
-        b64_img = base64.b64encode(img_data).decode("utf-8")
-        sp.playlist_upload_cover_image(new_playlist["id"], b64_img)
+        tracks = [item["track"]["uri"] for item in tracks_data if item["track"]]
+        random.shuffle(tracks)
 
-    sp.playlist_add_items(new_playlist["id"], tracks)
+        new_playlist = sp.user_playlist_create(
+            sp.current_user()["id"],
+            original["name"] + " (Shuffled)",
+            description="Shuffled version of " + original["name"],
+            public=False
+        )
 
-    return render_template("success.html", name=original["name"] + " (Shuffled)")
+        # Copy cover image if exists
+        if original["images"]:
+            try:
+                img_data = requests.get(original["images"][0]["url"]).content
+                img_b64 = base64.b64encode(img_data).decode("utf-8")
+                sp.playlist_upload_cover_image(new_playlist["id"], img_b64)
+            except Exception as e:
+                print("⚠️ Failed to upload image:", str(e))
+
+        sp.playlist_add_items(new_playlist["id"], tracks)
+
+        return f"""
+        <html>
+            <head><title>Playlist Created</title></head>
+            <body style='text-align:center; font-family:sans-serif; background:#121212; color:white;'>
+                <h1>✅ New Shuffled Playlist Created</h1>
+                <p>{original['name']} → {original['name']} (Shuffled)</p>
+                <a href="/playlists" style="color:#1DB954;">← Back to Playlists</a>
+            </body>
+        </html>
+        """
+
+    except Exception as e:
+        print("❌ Error in /randomize:", str(e))
+        return f"<h2 style='color:red;'>Something went wrong: {str(e)}</h2>"
+
 
 @app.route("/logout")
 def logout():
