@@ -1,19 +1,30 @@
+<!-- templates/playlists.html -->
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Choose Playlist</title>
+    <meta charset="UTF-8">
+    <title>Your Playlists</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <h1>Select a Playlist to Shuffle</h1>
-    <form action="/randomize" method="post">
-        <select name="playlist_id">
-            {% for playlist in playlists %}
-                <option value="{{ playlist.id }}">{{ playlist.name }}</option>
-            {% endfor %}
-        </select>
-        <button type="submit">Shuffle</button>
-    </form>
-    <br>
-    <a href="/logout">Logout</a>
+    <div class="container">
+        <h1>Your Playlists</h1>
+
+        {% for playlist in playlists %}
+        <div class="playlist">
+            {% if playlist.images %}
+            <img src="{{ playlist.images[0].url }}" alt="cover">
+            {% endif %}
+            <div>
+                <h3>{{ playlist.name }}</h3>
+                <p>{{ playlist.tracks.total }} tracks</p>
+            </div>
+            <form method="POST" action="/randomize">
+                <input type="hidden" name="playlist_id" value="{{ playlist.id }}">
+                <button type="submit">Shuffle</button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
 </body>
 </html>
