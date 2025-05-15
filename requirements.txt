@@ -2,4 +2,3 @@ Flask
 spotipy
 requests
 python-dotenv
-gunicorn
