@@ -2,15 +2,14 @@ from flask import Flask, redirect, request, session, url_for, render_template
 import os, random, requests, base64
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY")
 
-# Spotify authentication setup
+# ✅ Render is HTTPS, so cookies must be secure
+app.config['SESSION_COOKIE_SECURE'] = True
+
+# Setup Spotify auth
 sp_oauth = SpotifyOAuth(
     client_id=os.getenv("SPOTIPY_CLIENT_ID"),
     client_secret=os.getenv("SPOTIPY_CLIENT_SECRET"),
@@ -18,12 +17,11 @@ sp_oauth = SpotifyOAuth(
     scope="playlist-read-private playlist-modify-private playlist-modify-public ugc-image-upload"
 )
 
-# Get an authenticated Spotify client
 def get_spotify_client():
     token_info = session.get("token_info")
     if not token_info:
         return None
-    
+
     if sp_oauth.is_token_expired(token_info):
         try:
             token_info = sp_oauth.refresh_access_token(token_info["refresh_token"])
@@ -31,7 +29,7 @@ def get_spotify_client():
         except Exception:
             session.pop("token_info", None)
             return None
-    
+
     return spotipy.Spotify(auth=token_info["access_token"])
 
 @app.route("/")
@@ -44,9 +42,14 @@ def index():
 def callback():
     code = request.args.get("code")
     if not code:
-        return "Authorization failed"
-    token_info = sp_oauth.get_access_token(code)
-    session["token_info"] = token_info
+        return "Authorization failed."
+    
+    try:
+        token_info = sp_oauth.get_access_token(code)
+        session["token_info"] = token_info
+    except Exception as e:
+        return f"Auth error: {e}"
+    
     return redirect("/playlists")
 
 @app.route("/playlists")
@@ -54,10 +57,10 @@ def playlists():
     sp = get_spotify_client()
     if not sp:
         return redirect(url_for("index"))
-    
+
     try:
         playlists = sp.current_user_playlists()["items"]
-    except Exception:
+    except:
         session.pop("token_info", None)
         return redirect(url_for("index"))
 
@@ -68,7 +71,7 @@ def randomize():
     sp = get_spotify_client()
     if not sp:
         return redirect("/")
-    
+
     playlist_id = request.form.get("playlist_id")
     original = sp.playlist(playlist_id)
     tracks = [item["track"]["uri"] for item in original["tracks"]["items"]]
@@ -82,8 +85,9 @@ def randomize():
     )
 
     if original["images"]:
-        img = base64.b64encode(requests.get(original["images"][0]["url"]).content).decode("utf-8")
-        sp.playlist_upload_cover_image(new_playlist["id"], img)
+        img_data = requests.get(original["images"][0]["url"]).content
+        b64_img = base64.b64encode(img_data).decode("utf-8")
+        sp.playlist_upload_cover_image(new_playlist["id"], b64_img)
 
     sp.playlist_add_items(new_playlist["id"], tracks)
 
