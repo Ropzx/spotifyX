@@ -77,15 +77,27 @@ def randomize():
         if not playlist_id:
             return "❌ No playlist ID provided."
 
+        # Fetch full playlist details
         original = sp.playlist(playlist_id)
-        tracks_data = original["tracks"]["items"]
-        
-        if not tracks_data:
+
+        # Get all tracks (paginated)
+        tracks = []
+        offset = 0
+        while True:
+            response = sp.playlist_items(playlist_id, offset=offset, fields='items.track.uri,total', additional_types=['track'])
+            page_tracks = [item["track"]["uri"] for item in response["items"] if item["track"]]
+            tracks.extend(page_tracks)
+            offset += len(response["items"])
+            if len(response["items"]) == 0:
+                break
+
+        if not tracks:
             return "❌ No tracks found in this playlist."
 
-        tracks = [item["track"]["uri"] for item in tracks_data if item["track"]]
+        # Shuffle tracks
         random.shuffle(tracks)
 
+        # Create new playlist
         new_playlist = sp.user_playlist_create(
             sp.current_user()["id"],
             original["name"] + " (Shuffled)",
@@ -93,7 +105,7 @@ def randomize():
             public=False
         )
 
-        # Copy cover image if exists
+        # Upload image if present
         if original["images"]:
             try:
                 img_data = requests.get(original["images"][0]["url"]).content
@@ -102,11 +114,15 @@ def randomize():
             except Exception as e:
                 print("⚠️ Failed to upload image:", str(e))
 
-        sp.playlist_add_items(new_playlist["id"], tracks)
+        # Add tracks in batches of 100
+        for i in range(0, len(tracks), 100):
+            sp.playlist_add_items(new_playlist["id"], tracks[i:i+100])
 
         return f"""
         <html>
-            <head><title>Playlist Created</title></head>
+            <head><title>Playlist Created</title>
+            <link rel="stylesheet" href="/static/style.css">
+            </head>
             <body style='text-align:center; font-family:sans-serif; background:#121212; color:white;'>
                 <h1>✅ New Shuffled Playlist Created</h1>
                 <p>{original['name']} → {original['name']} (Shuffled)</p>
