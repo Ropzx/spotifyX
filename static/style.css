@@ -1,46 +1,154 @@
-/* static/style.css */
+/* Spotify-style, beautiful & responsive CSS */
 
 body {
     margin: 0;
     font-family: 'Segoe UI', sans-serif;
     background-color: #121212;
-    color: white;
+    color: #FFFFFF;
+    overflow-x: hidden;
 }
 
 .container {
-    max-width: 800px;
-    margin: 40px auto;
-    padding: 20px;
+    max-width: 900px;
+    margin: 60px auto;
+    padding: 30px;
     background-color: #181818;
-    border-radius: 12px;
+    border-radius: 20px;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
+    animation: fadeIn 0.6s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 h1 {
     text-align: center;
     color: #1DB954;
-    margin-bottom: 30px;
+    margin-bottom: 40px;
+    font-size: 36px;
+    font-weight: 600;
 }
 
 .playlist {
     display: flex;
     align-items: center;
-    background: #282828;
-    padding: 10px;
-    border-radius: 10px;
-    margin-bottom: 15px;
-    transition: 0.3s ease;
+    background: #242424;
+    padding: 16px;
+    border-radius: 16px;
+    margin-bottom: 20px;
+    transition: background 0.3s ease;
+    position: relative;
 }
 
 .playlist:hover {
-    background-color: #333;
+    background-color: #2a2a2a;
 }
 
 .playlist img {
     width: 80px;
     height: 80px;
-    border-radius: 8px;
+    border-radius: 10px;
+    object-fit: cover;
+    box-shadow: 0 0 12px rgba(0,0,0,0.4);
 }
 
 .info {
     flex: 1;
-    padding: 0
+    padding: 0 20px;
+    overflow: hidden;
+}
+
+.info h2 {
+    margin: 0;
+    font-size: 20px;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.info p {
+    margin: 5px 0 0;
+    color: #b3b3b3;
+    font-size: 14px;
+}
+
+form button {
+    background-color: #1DB954;
+    border: none;
+    padding: 12px 20px;
+    color: white;
+    border-radius: 30px;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.2s ease;
+}
+
+form button:hover {
+    background-color: #1ed760;
+}
+
+.logout {
+    text-align: center;
+    margin-top: 50px;
+}
+
+.logout a {
+    color: #b3b3b3;
+    text-decoration: none;
+    font-size: 14px;
+}
+
+.logout a:hover {
+    color: #fff;
+}
+
+/* Loading overlay */
+#loading {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(18, 18, 18, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    display: none;
+}
+
+.spinner {
+    border: 6px solid #282828;
+    border-top: 6px solid #1DB954;
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Show loading on form submit */
+form {
+    position: relative;
+}
+
+form.loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    border: 3px solid #1DB954;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    transform: translate(-50%, -50%);
+}
