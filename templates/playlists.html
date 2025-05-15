@@ -1,22 +1,21 @@
-<!-- templates/playlists.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-      <meta charset="UTF-8">
-    <title>Choose a Playlist to Shuffle</title>
+    <meta charset="UTF-8">
+    <title>Select Playlist to Shuffle</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <div class="container">
-        <h1>Your Playlists</h1>
+        <h1>Your Spotify Playlists</h1>
 
         {% for playlist in playlists %}
         <div class="playlist">
             {% if playlist.images %}
             <img src="{{ playlist.images[0].url }}" alt="cover">
             {% endif %}
-            <div>
-                <h3>{{ playlist.name }}</h3>
+            <div class="info">
+                <h2>{{ playlist.name }}</h2>
                 <p>{{ playlist.tracks.total }} tracks</p>
             </div>
             <form method="POST" action="/randomize">
@@ -25,6 +24,10 @@
             </form>
         </div>
         {% endfor %}
+
+        <div class="logout">
+            <a href="/logout">Logout</a>
+        </div>
     </div>
 </body>
 </html>
