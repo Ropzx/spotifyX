@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Select a Playlist</title>
+    <title>Choose Playlist</title>
 </head>
 <body>
     <h1>Select a Playlist to Shuffle</h1>
@@ -11,10 +11,9 @@
                 <option value="{{ playlist.id }}">{{ playlist.name }}</option>
             {% endfor %}
         </select>
-        <br><br>
         <button type="submit">Shuffle</button>
     </form>
     <br>
-    <a href="/logout">Log Out</a>
+    <a href="/logout">Logout</a>
 </body>
 </html>
