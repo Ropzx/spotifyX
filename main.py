@@ -18,7 +18,6 @@ def get_spotify_client():
     token_info = session.get("token_info")
     if not token_info:
         return None
-
     if sp_oauth.is_token_expired(token_info):
         try:
             token_info = sp_oauth.refresh_access_token(token_info["refresh_token"])
@@ -26,7 +25,6 @@ def get_spotify_client():
         except Exception:
             session.pop("token_info", None)
             return None
-
     return spotipy.Spotify(auth=token_info["access_token"])
 
 @app.route("/")
@@ -40,13 +38,11 @@ def callback():
     code = request.args.get("code")
     if not code:
         return "Authorization failed."
-
     try:
         token_info = sp_oauth.get_access_token(code)
         session["token_info"] = token_info
     except Exception as e:
         return f"Auth error: {e}"
-
     return redirect(url_for("playlists"))
 
 @app.route("/playlists")
@@ -54,13 +50,11 @@ def playlists():
     sp = get_spotify_client()
     if not sp:
         return redirect(url_for("index"))
-
     try:
         playlists = sp.current_user_playlists()["items"]
     except:
         session.pop("token_info", None)
         return redirect(url_for("index"))
-
     return render_template("playlists.html", playlists=playlists)
 
 @app.route("/randomize", methods=["POST"])
@@ -74,37 +68,39 @@ def randomize():
         if not playlist_id:
             return "❌ No playlist ID provided."
 
+        # Get original playlist info
         original = sp.playlist(playlist_id)
 
-        # Fetch all tracks
+        # Collect all tracks with pagination
         tracks = []
         offset = 0
+        limit = 100
         while True:
             response = sp.playlist_items(
                 playlist_id,
                 offset=offset,
-                fields='items.track.uri,total',
-                additional_types=['track']
+                limit=limit,
+                fields="items.track.uri,total",
+                additional_types=["track"]
             )
-            page_tracks = [
-                item["track"]["uri"]
-                for item in response["items"]
-                if item.get("track") and item["track"].get("uri")
-            ]
-            tracks.extend(page_tracks)
-            offset += len(response["items"])
-            if len(response["items"]) == 0:
+            batch = [item["track"]["uri"] for item in response["items"] if item["track"]]
+            if not batch:
                 break
+            tracks.extend(batch)
+            offset += limit
 
         if not tracks:
-            return "❌ No valid tracks found in this playlist."
+            return "❌ No tracks found in this playlist."
 
+        # Shuffle tracks
         random.shuffle(tracks)
 
+        # Create new playlist
+        user_id = sp.current_user()["id"]
         new_playlist = sp.user_playlist_create(
-            sp.current_user()["id"],
-            original["name"] + " (Shuffled)",
-            description="Shuffled version of " + original["name"],
+            user_id,
+            f"{original['name']} (Shuffled)",
+            description=f"Shuffled version of {original['name']}",
             public=False
         )
 
@@ -117,10 +113,11 @@ def randomize():
             except Exception as e:
                 print("⚠️ Failed to upload image:", str(e))
 
-        # Add all tracks in batches of 100
+        # Add shuffled tracks in batches of 100
         for i in range(0, len(tracks), 100):
-            sp.playlist_add_items(new_playlist["id"], tracks[i:i+100])
+            sp.playlist_add_items(new_playlist["id"], tracks[i:i + 100])
 
+        # Success message
         return f"""
         <html>
             <head><title>Playlist Created</title>
@@ -133,7 +130,6 @@ def randomize():
             </body>
         </html>
         """
-
     except Exception as e:
         print("❌ Error in /randomize:", str(e))
         return f"<h2 style='color:red;'>Something went wrong: {str(e)}</h2>"
