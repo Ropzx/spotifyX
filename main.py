@@ -63,73 +63,76 @@ def randomize():
     if not sp:
         return redirect("/")
 
-    try:
-        playlist_id = request.form.get("playlist_id")
-        if not playlist_id:
-            return "❌ No playlist ID provided."
+    playlist_id = request.form.get("playlist_id")
+    if not playlist_id:
+        return "❌ No playlist ID provided."
 
-        # Get original playlist info
-        original = sp.playlist(playlist_id)
+    def process_playlist(sp, playlist_id):
+        try:
+            original = sp.playlist(playlist_id)
+            tracks = []
+            offset = 0
+            limit = 100
+            while True:
+                response = sp.playlist_items(
+                    playlist_id,
+                    offset=offset,
+                    limit=limit,
+                    fields="items.track.uri,total",
+                    additional_types=["track"]
+                )
+                batch = [item["track"]["uri"] for item in response["items"] if item["track"]]
+                if not batch:
+                    break
+                tracks.extend(batch)
+                offset += limit
 
-        # Collect all tracks with pagination
-        tracks = []
-        offset = 0
-        limit = 100
-        while True:
-            response = sp.playlist_items(
-                playlist_id,
-                offset=offset,
-                limit=limit,
-                fields="items.track.uri,total",
-                additional_types=["track"]
+            if not tracks:
+                print("❌ No tracks found.")
+                return
+
+            random.shuffle(tracks)
+
+            user_id = sp.current_user()["id"]
+            new_playlist = sp.user_playlist_create(
+                user_id,
+                f"{original['name']} (Shuffled)",
+                description=f"Shuffled version of {original['name']}",
+                public=False
             )
-            batch = [item["track"]["uri"] for item in response["items"] if item["track"]]
-            if not batch:
-                break
-            tracks.extend(batch)
-            offset += limit
 
-        if not tracks:
-            return "❌ No tracks found in this playlist."
+            if original["images"]:
+                try:
+                    img_data = requests.get(original["images"][0]["url"]).content
+                    img_b64 = base64.b64encode(img_data).decode("utf-8")
+                    sp.playlist_upload_cover_image(new_playlist["id"], img_b64)
+                except Exception as e:
+                    print("⚠️ Image upload failed:", e)
 
-        # Shuffle tracks
-        random.shuffle(tracks)
+            for i in range(0, len(tracks), 100):
+                sp.playlist_add_items(new_playlist["id"], tracks[i:i + 100])
 
-        # Create new playlist
-        user_id = sp.current_user()["id"]
-        new_playlist = sp.user_playlist_create(
-            user_id,
-            f"{original['name']} (Shuffled)",
-            description=f"Shuffled version of {original['name']}",
-            public=False
-        )
+            print(f"✅ Created playlist: {new_playlist['external_urls']['spotify']}")
 
-        # Copy cover image
-        if original["images"]:
-            try:
-                img_data = requests.get(original["images"][0]["url"]).content
-                img_b64 = base64.b64encode(img_data).decode("utf-8")
-                sp.playlist_upload_cover_image(new_playlist["id"], img_b64)
-            except Exception as e:
-                print("⚠️ Failed to upload image:", str(e))
+        except Exception as e:
+            print("❌ Error in background processing:", str(e))
 
-        # Add shuffled tracks in batches of 100
-        for i in range(0, len(tracks), 100):
-            sp.playlist_add_items(new_playlist["id"], tracks[i:i + 100])
+    # Run processing in background
+    thread = threading.Thread(target=process_playlist, args=(sp, playlist_id))
+    thread.start()
 
-        # Success message
-        return f"""
-        <html>
-            <head><title>Playlist Created</title>
-            <link rel="stylesheet" href="/static/style.css">
-            </head>
-            <body style='text-align:center; font-family:sans-serif; background:#121212; color:white;'>
-                <h1>✅ New Shuffled Playlist Created</h1>
-                <p>{original['name']} → {original['name']} (Shuffled)</p>
-                <a href="/playlists" style="color:#1DB954;">← Back to Playlists</a>
-            </body>
-        </html>
-        """
+    return """
+    <html>
+        <head><title>Shuffling...</title>
+        <link rel="stylesheet" href="/static/style.css">
+        </head>
+        <body style='text-align:center; font-family:sans-serif; background:#121212; color:white;'>
+            <h1>🎶 Shuffling Your Playlist...</h1>
+            <p>This may take up to a minute for large playlists.</p>
+            <a href="/playlists" style="color:#1DB954;">← Back to Playlists</a>
+        </body>
+    </html>
+    """
     except Exception as e:
         print("❌ Error in /randomize:", str(e))
         return f"<h2 style='color:red;'>Something went wrong: {str(e)}</h2>"
