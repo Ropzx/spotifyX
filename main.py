@@ -6,10 +6,10 @@ from spotipy.oauth2 import SpotifyOAuth
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY")
 
-# ✅ Render is HTTPS, so cookies must be secure
+
 app.config['SESSION_COOKIE_SECURE'] = True
 
-# Setup Spotify auth
+
 sp_oauth = SpotifyOAuth(
     client_id=os.getenv("SPOTIPY_CLIENT_ID"),
     client_secret=os.getenv("SPOTIPY_CLIENT_SECRET"),
@@ -77,10 +77,10 @@ def randomize():
         if not playlist_id:
             return "❌ No playlist ID provided."
 
-        # Fetch full playlist details
+        
         original = sp.playlist(playlist_id)
 
-        # Get all tracks (paginated)
+       
         tracks = []
         offset = 0
         while True:
@@ -94,10 +94,10 @@ def randomize():
         if not tracks:
             return "❌ No tracks found in this playlist."
 
-        # Shuffle tracks
+       
         random.shuffle(tracks)
 
-        # Create new playlist
+      
         new_playlist = sp.user_playlist_create(
             sp.current_user()["id"],
             original["name"] + " (Shuffled)",
@@ -105,7 +105,7 @@ def randomize():
             public=False
         )
 
-        # Upload image if present
+        
         if original["images"]:
             try:
                 img_data = requests.get(original["images"][0]["url"]).content
@@ -114,7 +114,7 @@ def randomize():
             except Exception as e:
                 print("⚠️ Failed to upload image:", str(e))
 
-        # Add tracks in batches of 100
+     
         for i in range(0, len(tracks), 100):
             sp.playlist_add_items(new_playlist["id"], tracks[i:i+100])
 
