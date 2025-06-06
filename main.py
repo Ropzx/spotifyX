@@ -1,5 +1,5 @@
 from flask import Flask, redirect, request, session, url_for, render_template
-import os, random, requests, base64
+import os, random, requests, base64, threading
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 
@@ -117,7 +117,6 @@ def randomize():
         except Exception as e:
             print("❌ Error in background processing:", str(e))
 
-    # Run processing in background
     thread = threading.Thread(target=process_playlist, args=(sp, playlist_id))
     thread.start()
 
@@ -133,9 +132,6 @@ def randomize():
         </body>
     </html>
     """
-    except Exception as e:
-        print("❌ Error in /randomize:", str(e))
-        return f"<h2 style='color:red;'>Something went wrong: {str(e)}</h2>"
 
 @app.route("/logout")
 def logout():
