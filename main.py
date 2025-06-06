@@ -5,10 +5,7 @@ from spotipy.oauth2 import SpotifyOAuth
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY")
-
-
 app.config['SESSION_COOKIE_SECURE'] = True
-
 
 sp_oauth = SpotifyOAuth(
     client_id=os.getenv("SPOTIPY_CLIENT_ID"),
@@ -35,7 +32,7 @@ def get_spotify_client():
 @app.route("/")
 def index():
     if "token_info" in session:
-        return redirect("/playlists")
+        return redirect(url_for("playlists"))
     return redirect(sp_oauth.get_authorize_url())
 
 @app.route("/callback")
@@ -50,7 +47,7 @@ def callback():
     except Exception as e:
         return f"Auth error: {e}"
     
-    return redirect("/playlists")
+    return redirect(url_for("playlists"))
 
 @app.route("/playlists")
 def playlists():
@@ -77,27 +74,37 @@ def randomize():
         if not playlist_id:
             return "❌ No playlist ID provided."
 
-        
         original = sp.playlist(playlist_id)
 
        
         tracks = []
         offset = 0
+        limit = 100
+        total = None
+
         while True:
-            response = sp.playlist_items(playlist_id, offset=offset, fields='items.track.uri,total', additional_types=['track'])
-            page_tracks = [item["track"]["uri"] for item in response["items"] if item["track"]]
+            response = sp.playlist_items(
+                playlist_id,
+                offset=offset,
+                limit=limit,
+                additional_types=['track']
+            )
+            page_tracks = [item["track"]["uri"] for item in response["items"] if item.get("track")]
             tracks.extend(page_tracks)
-            offset += len(response["items"])
-            if len(response["items"]) == 0:
+
+            if total is None:
+                total = response.get("total", 0)
+            offset += limit
+            if offset >= total:
                 break
 
         if not tracks:
             return "❌ No tracks found in this playlist."
 
-       
+        
         random.shuffle(tracks)
 
-      
+        
         new_playlist = sp.user_playlist_create(
             sp.current_user()["id"],
             original["name"] + " (Shuffled)",
@@ -114,7 +121,7 @@ def randomize():
             except Exception as e:
                 print("⚠️ Failed to upload image:", str(e))
 
-     
+        
         for i in range(0, len(tracks), 100):
             sp.playlist_add_items(new_playlist["id"], tracks[i:i+100])
 
@@ -134,7 +141,6 @@ def randomize():
     except Exception as e:
         print("❌ Error in /randomize:", str(e))
         return f"<h2 style='color:red;'>Something went wrong: {str(e)}</h2>"
-
 
 @app.route("/logout")
 def logout():
