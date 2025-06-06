@@ -1,5 +1,5 @@
-from flask import Flask, redirect, request, session, url_for, render_template, Response
-import os, random, requests, base64
+from flask import Flask, redirect, request, session, url_for, render_template
+import os, random, requests, base64, threading
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 
@@ -41,8 +41,8 @@ def callback():
     try:
         token_info = sp_oauth.get_access_token(code)
         session["token_info"] = token_info
-    except Exception as e:
-        return f"Auth error: {e}"
+    except Exception:
+        return "Authorization error."
     return redirect(url_for("playlists"))
 
 @app.route("/playlists")
@@ -67,15 +67,12 @@ def randomize():
     if not playlist_id:
         return "❌ No playlist ID provided."
 
-    def generate():
+    def process_playlist(sp, playlist_id):
         try:
             original = sp.playlist(playlist_id)
-            yield "<p>✅ Fetched playlist details...</p>"
-
             tracks = []
             offset = 0
             limit = 100
-            
             while True:
                 response = sp.playlist_items(
                     playlist_id,
@@ -84,23 +81,16 @@ def randomize():
                     fields="items.track.uri,total",
                     additional_types=["track"]
                 )
-                batch = [
-                    item["track"]["uri"]
-                    for item in response["items"]
-                    if item["track"] and item["track"]["uri"] and item["track"]["uri"].startswith("spotify:track:")
-                ]
+                batch = [item["track"]["uri"] for item in response["items"] if item["track"]]
                 if not batch:
                     break
                 tracks.extend(batch)
                 offset += limit
-                print(f"📦 Fetched {len(tracks)} tracks...")
 
             if not tracks:
-                yield "<p>❌ No tracks found.</p>"
                 return
 
             random.shuffle(tracks)
-            yield f"<p>🔀 Shuffled {len(tracks)} tracks...</p>"
 
             user_id = sp.current_user()["id"]
             new_playlist = sp.user_playlist_create(
@@ -109,42 +99,36 @@ def randomize():
                 description=f"Shuffled version of {original['name']}",
                 public=False
             )
-            yield f"<p>🆕 Created new playlist: <a style='color:#1DB954;' href='{new_playlist['external_urls']['spotify']}' target='_blank'>Open on Spotify</a></p>"
 
             if original["images"]:
                 try:
                     img_data = requests.get(original["images"][0]["url"]).content
                     img_b64 = base64.b64encode(img_data).decode("utf-8")
                     sp.playlist_upload_cover_image(new_playlist["id"], img_b64)
-                    yield "<p>🖼️ Copied playlist image</p>"
-                except Exception as e:
-                    yield f"<p>⚠️ Image upload failed: {e}</p>"
+                except Exception:
+                    pass
 
             for i in range(0, len(tracks), 100):
                 sp.playlist_add_items(new_playlist["id"], tracks[i:i + 100])
-                yield f"<p>➕ Added tracks {i+1} - {min(i+100, len(tracks))}</p>"
 
-            yield "<h2 style='color:#1DB954;'>✅ Done!</h2>"
-        except Exception as e:
-            yield f"<p style='color:red;'>❌ Error: {str(e)}</p>"
+        except Exception:
+            pass
 
-    return Response(
-        f"""
-        <html>
-            <head>
-                <title>Shuffling...</title>
-                <link rel="stylesheet" href="/static/style.css">
-            </head>
-            <body style='font-family:sans-serif; background:#121212; color:white; padding:20px;'>
-                <h1>🎶 Shuffling Your Playlist...</h1>
-                <div id="log">
-                    {''.join(generate())}
-                </div>
-                <a href="/playlists" style="color:#1DB954;">← Back to Playlists</a>
-            </body>
-        </html>
-        """, mimetype='text/html'
-    )
+    thread = threading.Thread(target=process_playlist, args=(sp, playlist_id))
+    thread.start()
+
+    return """
+    <html>
+        <head><title>Shuffling...</title>
+        <link rel="stylesheet" href="/static/style.css">
+        </head>
+        <body style='text-align:center; font-family:sans-serif; background:#121212; color:white;'>
+            <h1 style='margin-top: 20vh;'>🎶 Shuffling Your Playlist...</h1>
+            <p>This may take a moment depending on the size of your playlist.</p>
+            <a href="/playlists" style="color:#1DB954;">← Back to Playlists</a>
+        </body>
+    </html>
+    """
 
 @app.route("/logout")
 def logout():
