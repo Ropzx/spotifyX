@@ -75,7 +75,7 @@ def randomize():
             tracks = []
             offset = 0
             limit = 100
-            total = 0
+            
             while True:
                 response = sp.playlist_items(
                     playlist_id,
@@ -84,13 +84,16 @@ def randomize():
                     fields="items.track.uri,total",
                     additional_types=["track"]
                 )
-                batch = [item["track"]["uri"] for item in response["items"] if item["track"]]
+                batch = [
+                    item["track"]["uri"]
+                    for item in response["items"]
+                    if item["track"] and item["track"]["uri"] and item["track"]["uri"].startswith("spotify:track:")
+                ]
                 if not batch:
                     break
                 tracks.extend(batch)
-                total += len(batch)
-                yield f"<p>📦 Fetched {total} tracks...</p>"
                 offset += limit
+                print(f"📦 Fetched {len(tracks)} tracks...")
 
             if not tracks:
                 yield "<p>❌ No tracks found.</p>"
