@@ -41,8 +41,8 @@ def callback():
     try:
         token_info = sp_oauth.get_access_token(code)
         session["token_info"] = token_info
-    except Exception:
-        return "Authorization error."
+    except Exception as e:
+        return f"Auth error: {e}"
     return redirect(url_for("playlists"))
 
 @app.route("/playlists")
@@ -69,10 +69,14 @@ def randomize():
 
     def process_playlist(sp, playlist_id):
         try:
+            print("🎶 Shuffling Your Playlist...")
             original = sp.playlist(playlist_id)
-            tracks = []
+            print("✅ Fetched playlist details...")
+
+           tracks = []
             offset = 0
             limit = 100
+            
             while True:
                 response = sp.playlist_items(
                     playlist_id,
@@ -81,16 +85,24 @@ def randomize():
                     fields="items.track.uri,total",
                     additional_types=["track"]
                 )
-                batch = [item["track"]["uri"] for item in response["items"] if item["track"]]
+                batch = [
+                    item["track"]["uri"]
+                    for item in response["items"]
+                    if item["track"] and item["track"]["uri"] and item["track"]["uri"].startswith("spotify:track:")
+                ]
                 if not batch:
                     break
                 tracks.extend(batch)
                 offset += limit
+                print(f"📦 Fetched {len(tracks)} tracks...")
+
 
             if not tracks:
+                print("❌ No tracks found.")
                 return
 
             random.shuffle(tracks)
+            print(f"🔀 Shuffled {len(tracks)} tracks...")
 
             user_id = sp.current_user()["id"]
             new_playlist = sp.user_playlist_create(
@@ -99,20 +111,23 @@ def randomize():
                 description=f"Shuffled version of {original['name']}",
                 public=False
             )
+            print("🆕 Created new playlist:", new_playlist["external_urls"]["spotify"])
 
             if original["images"]:
                 try:
                     img_data = requests.get(original["images"][0]["url"]).content
                     img_b64 = base64.b64encode(img_data).decode("utf-8")
                     sp.playlist_upload_cover_image(new_playlist["id"], img_b64)
-                except Exception:
-                    pass
+                    print("🖼️ Copied playlist image")
+                except Exception as e:
+                    print("⚠️ Image upload failed:", e)
 
             for i in range(0, len(tracks), 100):
                 sp.playlist_add_items(new_playlist["id"], tracks[i:i + 100])
+                print(f"➕ Added tracks {i+1} - {min(i+100, len(tracks))}")
 
-        except Exception:
-            pass
+        except Exception as e:
+            print("❌ Error:", str(e))
 
     thread = threading.Thread(target=process_playlist, args=(sp, playlist_id))
     thread.start()
@@ -123,8 +138,8 @@ def randomize():
         <link rel="stylesheet" href="/static/style.css">
         </head>
         <body style='text-align:center; font-family:sans-serif; background:#121212; color:white;'>
-            <h1 style='margin-top: 20vh;'>🎶 Shuffling Your Playlist...</h1>
-            <p>This may take a moment depending on the size of your playlist.</p>
+            <h1>🎶 Shuffling Your Playlist...</h1>
+            <p>This may take up to a minute for large playlists.</p>
             <a href="/playlists" style="color:#1DB954;">← Back to Playlists</a>
         </body>
     </html>
