@@ -73,7 +73,7 @@ def randomize():
             original = sp.playlist(playlist_id)
             print("✅ Fetched playlist details...")
 
-           tracks = []
+            tracks = []
             offset = 0
             limit = 100
             
