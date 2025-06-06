@@ -40,13 +40,13 @@ def callback():
     code = request.args.get("code")
     if not code:
         return "Authorization failed."
-    
+
     try:
         token_info = sp_oauth.get_access_token(code)
         session["token_info"] = token_info
     except Exception as e:
         return f"Auth error: {e}"
-    
+
     return redirect(url_for("playlists"))
 
 @app.route("/playlists")
@@ -76,35 +76,31 @@ def randomize():
 
         original = sp.playlist(playlist_id)
 
-       
+        # Fetch all tracks
         tracks = []
         offset = 0
-        limit = 100
-        total = None
-
         while True:
             response = sp.playlist_items(
                 playlist_id,
                 offset=offset,
-                limit=limit,
+                fields='items.track.uri,total',
                 additional_types=['track']
             )
-            page_tracks = [item["track"]["uri"] for item in response["items"] if item.get("track")]
+            page_tracks = [
+                item["track"]["uri"]
+                for item in response["items"]
+                if item.get("track") and item["track"].get("uri")
+            ]
             tracks.extend(page_tracks)
-
-            if total is None:
-                total = response.get("total", 0)
-            offset += limit
-            if offset >= total:
+            offset += len(response["items"])
+            if len(response["items"]) == 0:
                 break
 
         if not tracks:
-            return "❌ No tracks found in this playlist."
+            return "❌ No valid tracks found in this playlist."
 
-        
         random.shuffle(tracks)
 
-        
         new_playlist = sp.user_playlist_create(
             sp.current_user()["id"],
             original["name"] + " (Shuffled)",
@@ -112,7 +108,7 @@ def randomize():
             public=False
         )
 
-        
+        # Copy cover image
         if original["images"]:
             try:
                 img_data = requests.get(original["images"][0]["url"]).content
@@ -121,7 +117,7 @@ def randomize():
             except Exception as e:
                 print("⚠️ Failed to upload image:", str(e))
 
-        
+        # Add all tracks in batches of 100
         for i in range(0, len(tracks), 100):
             sp.playlist_add_items(new_playlist["id"], tracks[i:i+100])
 
